@@ -557,7 +557,7 @@
 
   function initWorker() {
     try {
-      worker = new Worker('assets/solver.worker.js');
+      worker = new Worker('assets/solver.worker.js?v=20261117a');
       worker.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'progress') {
@@ -578,7 +578,7 @@
 
   function initWasmWorker() {
     try {
-      wasmWorker = new Worker('assets/wasm-worker.js');
+      wasmWorker = new Worker('assets/wasm-worker.js?v=20261117a');
       wasmWorker.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'log') {

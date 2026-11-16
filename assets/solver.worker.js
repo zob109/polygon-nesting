@@ -1,7 +1,7 @@
 /* solver.worker.js — 在后台线程跑求解，避免阻塞界面 */
 'use strict';
 
-importScripts('solver.js');
+importScripts('solver.js' + (self.location.search || ''));
 
 self.onmessage = function (e) {
   var d = e.data || {};

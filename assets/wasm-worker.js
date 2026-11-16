@@ -6,8 +6,10 @@
  */
 'use strict';
 
+// 继承父页面的版本号，保证 worker 内部加载的脚本也跟着刷新，不被 10 分钟缓存卡住
+var VER = self.location.search || '';
 var BASE = new URL('wasm/', self.location.href).href;
-importScripts('wasm/solver_wasm.js');
+importScripts('wasm/solver_wasm.js' + VER);
 
 function extractCaption(svg) {
   var texts = [];
@@ -58,7 +60,7 @@ self.onmessage = function (e) {
       }
     },
     stdin: function () { return pos < text.length ? text.charCodeAt(pos++) : null; },
-    locateFile: function (p) { return BASE + p; }
+    locateFile: function (p) { return BASE + p + VER; }
   }).then(function (Module) {
     try { Module.FS.mkdir('/visualizations'); } catch (err) { /* 已存在 */ }
 
