@@ -94,19 +94,19 @@ canvas {
   height: 100%;
 }
 
-#frameImg {
+#frameBox {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  bottom: 16px;
-  left: 16px;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  background: transparent;
+  inset: 16px;
+  overflow: hidden;
 }
 
-#frameImg[hidden] { display: none; }
+#frameBox svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#frameBox[hidden] { display: none; }
 
 .badge {
   position: absolute;

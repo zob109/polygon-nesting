@@ -97,9 +97,6 @@ self.onmessage = function (e) {
     var totalBytes = 0;
     for (var i = 0; i < files.length; i++) {
       var svg = Module.FS.readFile(dir + '/' + files[i], { encoding: 'utf8' });
-      // 原始 SVG 只有 viewBox 没有宽高，放进 <img> 会按浏览器默认尺寸显示，
-      // 这里补上 100%/100% 让它铺满容器，同时保持等比
-      svg = svg.replace(/<svg /, '<svg width="100%" height="100%" preserveAspectRatio="xMidYMid meet" ');
       totalBytes += svg.length;
       var cap = extractCaption(svg);
       frames.push({ svg: svg, label: cap.label, sum: cap.sum, placed: cap.placed });

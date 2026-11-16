@@ -22,8 +22,7 @@
     raf: 0,
     stats: null,
     mode: 'js',          // 'js' = 移植版画布；'wasm' = 原版 C++ 的 SVG 帧
-    wasmFrames: [],
-    frameUrls: []
+    wasmFrames: []
   };
 
   var cv = $('cv');
@@ -300,7 +299,7 @@
     $('mFrame').textContent = (i + 1) + '/' + state.frames.length;
 
     if (state.mode === 'wasm') {
-      $('frameImg').src = state.frameUrls[i] || '';
+      setFrameSvg(state.wasmFrames[i]);
       $('phaseBadge').textContent = '原版 C++';
       $('stepLabel').textContent = f.label || ('帧 ' + (i + 1));
       $('mCost').textContent = (f.sum != null) ? f.sum.toFixed(3) : '—';
@@ -445,10 +444,6 @@
     if (!res || res.error) { fail(res && res.error || '求解失败'); return; }
     if (!res.frames || !res.frames.length) { fail('求解器没有产出可视化帧'); return; }
 
-    for (var i = 0; i < state.frameUrls.length; i++) URL.revokeObjectURL(state.frameUrls[i]);
-    state.frameUrls = res.frames.map(function (f) {
-      return URL.createObjectURL(new Blob([f.svg], { type: 'image/svg+xml' }));
-    });
     state.wasmFrames = res.frames;
     state.frames = res.frames;
     state.mode = 'wasm';
@@ -467,11 +462,19 @@
     play();
   }
 
+  // 直接把求解器产出的 SVG 内联进 DOM：viewBox + preserveAspectRatio 会自己等比缩放，
+  // 比 <img> + object-fit 稳（后者对这种只有 viewBox、没有宽高的 SVG 会拉伸）
+  function setFrameSvg(f) {
+    if (!f) return;
+    var svg = f.svg.replace(/<\?xml[^>]*\?>/, '');
+    $('frameBox').innerHTML = svg;
+  }
+
   function showViewer(mode) {
-    var img = $('frameImg'), cvEl = $('cv');
+    var box = $('frameBox'), cvEl = $('cv');
     var isWasm = (mode === 'wasm');
-    if (isWasm) { img.hidden = false; cvEl.style.display = 'none'; }
-    else { img.hidden = true; cvEl.style.display = 'block'; resize(); }
+    if (isWasm) { box.hidden = false; cvEl.style.display = 'none'; }
+    else { box.hidden = true; box.innerHTML = ''; cvEl.style.display = 'block'; resize(); }
 
     // 这些只对 JS 画布有意义（原位虚线、候选点、编号、阶段跳转）
     var hideForWasm = ['.legend', '.toggles'];
