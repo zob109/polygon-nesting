@@ -5,8 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>多边形排样求解器 · 过程可视化</title>
   <meta name="description" content="二维多边形排样求解器的逐步可视化：BVH 碰撞检测、NFP 候选搜索、全局压缩与模拟退火，可在线修改输入数据重新求解。">
+  <meta name="nest-build" content="20261117e">
+  <meta http-equiv="Cache-Control" content="no-cache">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="assets/app.css?v=20261117c">
+  <script>
+  /*
+   * 版本自检：GitHub Pages 给 index.html 也设了 max-age=600，
+   * 光靠资源版本号不够——旧的 index.html 会把所有资源都钉在旧版本上。
+   * 这里在页面最早期拉一次 version.json（带随机参数，绕过缓存），
+   * 如果和本文件内嵌的 build 不一致，就带 ?v= 重新加载，拿到新的 HTML。
+   */
+  (function () {
+    var meta = document.querySelector('meta[name="nest-build"]');
+    var BUILD = meta ? meta.getAttribute('content') : '';
+    window.__nestVersionCheck = function () {
+      if (!BUILD) return Promise.resolve('no-build');
+      return fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.v) return 'no-version';
+          if (d.v === BUILD) {
+            // 版本一致：顺手把地址栏的 ?v= 去掉
+            if (location.search.indexOf('v=') >= 0) {
+              history.replaceState(null, '', location.pathname);
+            }
+            return 'same';
+          }
+          if (sessionStorage.getItem('nest.reloaded') === d.v) return 'loop-blocked';
+          sessionStorage.setItem('nest.reloaded', d.v);
+          location.replace(location.pathname + '?v=' + encodeURIComponent(d.v));
+          return 'reloading';
+        })
+        .catch(function () { return 'offline'; });
+    };
+    window.__nestVersionCheck();
+  })();
+  </script>
+  <link rel="stylesheet" href="assets/app.css?v=20261117e">
 </head>
 <body>
 
@@ -134,8 +169,13 @@
     </aside>
   </main>
 
-  <script src="assets/solver.js?v=20261117c"></script>
-  <script src="assets/data.js?v=20261117c"></script>
-  <script src="assets/app.js?v=20261117c"></script>
+  <footer class="foot">
+    <span>版本 <b id="buildTag">20261117e</b></span>
+    <button class="linkish" id="btnCheckVer" type="button">检查更新</button>
+  </footer>
+
+  <script src="assets/solver.js?v=20261117e"></script>
+  <script src="assets/data.js?v=20261117e"></script>
+  <script src="assets/app.js?v=20261117e"></script>
 </body>
 </html>

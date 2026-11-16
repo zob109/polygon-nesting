@@ -626,7 +626,7 @@
 
   function initWorker() {
     try {
-      worker = new Worker('assets/solver.worker.js?v=20261117c');
+      worker = new Worker('assets/solver.worker.js?v=20261117e');
       worker.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'progress') {
@@ -647,7 +647,7 @@
 
   function initWasmWorker() {
     try {
-      wasmWorker = new Worker('assets/wasm-worker.js?v=20261117c');
+      wasmWorker = new Worker('assets/wasm-worker.js?v=20261117e');
       wasmWorker.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'log') {
@@ -700,6 +700,25 @@
       var isWasm = this.value === 'wasm';
       $('limitSel').hidden = !isWasm;
       $('qualitySel').hidden = isWasm;
+    };
+
+    $('btnCheckVer').onclick = function () {
+      var btn = this;
+      var label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '检查中…';
+      var done = function (msg) {
+        btn.textContent = msg;
+        btn.disabled = false;
+        setTimeout(function () { btn.textContent = label; }, 2200);
+      };
+      if (typeof window.__nestVersionCheck !== 'function') { done('无自检'); return; }
+      window.__nestVersionCheck().then(function (r) {
+        if (r === 'same') done('已是最新');
+        else if (r === 'reloading') done('发现新版，正在重载');
+        else if (r === 'offline') done('离线，无法检查');
+        else done('检查失败');
+      });
     };
 
     $('btnAdd').onclick = function () {
@@ -799,6 +818,7 @@
   // 调试出口（也方便在控制台里手动跳帧）
   window.__nest = {
     state: state,
+    checkVersion: function () { return window.__nestVersionCheck && window.__nestVersionCheck(); },
     isBusy: function () { return busy; },
     solve: solveCurrent,
     goTo: function (i) { pause(); goTo(i); },
