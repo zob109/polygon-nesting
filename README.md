@@ -104,6 +104,44 @@ diff 见 [`wasm/changes.patch`](wasm/changes.patch)，说明见 [`wasm/README.md
 4. **候选按距离升序检查**：找到第一个合法位置即停，等价于在同一候选集上取最小 |trans|。
 5. **退火用低成本评估**：对应原实现的 fast/full 两级漏斗。
 
+## 为什么打开总是最新版
+
+GitHub Pages 给**所有**资源（包括 `index.html` 自己）都返回 `Cache-Control: max-age=600`。
+只给 CSS/JS 加 `?v=` 版本号是不够的：如果浏览器缓存了旧的 `index.html`，
+它引用的仍然是旧版本号，用户就会一直看到旧页面，最多要等 10 分钟。
+
+所以页面自带一次版本自检：
+
+1. `index.html` 里写死一个 `build` 号（`<meta name="nest-build">`）；
+2. 页面加载最早期去拉 `version.json?t=<时间戳>`（唯一 URL + `cache: no-store`，必走网络）；
+3. 两边不一致 → `location.replace(pathname + '?v=' + 新版本号)`。带查询串的 URL 是独立的缓存条目，
+   等于强制重新取 HTML；
+4. 用 `sessionStorage` 挡一次死循环：万一 CDN 上 `version.json` 比 `index.html` 先更新，
+   不会无限重载。
+
+版本一致时顺手把地址栏的 `?v=` 用 `history.replaceState` 去掉，URL 保持干净。
+
+页脚会显示当前版本号，旁边有「检查更新」按钮可以手动触发。
+
+### 发版流程
+
+改完代码后**必须同时改版本号**，否则自检会认为"已经是最新"。需要改三处：
+
+| 文件 | 位置 |
+|---|---|
+| `index.html` | `<meta name="nest-build">` + 4 处资源引用 `?v=` |
+| `assets/app.js` | 2 处 `new Worker('...?v=')` |
+| `version.json` | `v` 字段 |
+
+一次性替换（把旧号换成新号，四个文件一起改）：
+
+```bash
+OLD=20261117e NEW=20261117f
+sed -i "s/$OLD/$NEW/g" index.html assets/app.js version.json
+```
+
+`assets/wasm-worker.js` 不用改——它从 `self.location.search` 继承父页面的版本号。
+
 ## 未放置的多边形
 
 求解器输出的帧里只有"已经放下去"的多边形。如果只显示这些，会让人以为多边形是凭空出现的，
@@ -193,6 +231,7 @@ polygon-nesting/
 ├── reference/
 │   ├── README.md           C++ 原版怎么编译、怎么跑、参考结果
 │   └── cpp_out_default.txt C++ 原版在默认算例上的输出
+├── version.json            页面版本号（供自检比对）
 └── data/default.in         默认算例原文
 ```
 
