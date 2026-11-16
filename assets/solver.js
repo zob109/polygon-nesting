@@ -1432,6 +1432,113 @@
     };
   }
 
+
+  /* ============================ 输入合法性检查 ============================ */
+  /*
+   * 求解器本身不检查输入：自交的边界、零面积多边形、面积超过边界……都会让放置无解，
+   * C++ 版甚至会跑满 57 秒再返回 INF。所以在提交求解前先做一遍结构和几何检查。
+   */
+
+  function signedArea2(pts) {
+    var s = 0, n = pts.length;
+    for (var i = 0; i < n; i++) s += vcross(pts[i], pts[(i + 1) % n]);
+    return s * 0.5;
+  }
+
+  // 返回第一处自交的边对 [i, j]，没有则返回 null
+  function findSelfIntersection(pts) {
+    var n = pts.length;
+    for (var i = 0; i < n; i++) {
+      var a = pts[i], b = pts[(i + 1) % n];
+      for (var j = i + 1; j < n; j++) {
+        if (j === i || (j + 1) % n === i || j === (i + 1) % n) continue;
+        var c = pts[j], d = pts[(j + 1) % n];
+        if (segmentsIntersectInterior(a, b, c, d)) return [i, j];
+      }
+    }
+    return null;
+  }
+
+  function validateInput(text) {
+    var parsed = parseInput(text);
+    if (parsed.error) return { ok: false, errors: [parsed.error], warnings: [], stats: null };
+
+    var boundary = parsed.boundary, polys = parsed.polys;
+    var errors = [], warnings = [];
+    var i, j;
+
+    // 1. 坐标必须是有限数
+    for (i = 0; i < boundary.length; i++) {
+      if (!isFinite(boundary[i].x) || !isFinite(boundary[i].y)) {
+        return { ok: false, errors: ['边界第 ' + (i + 1) + ' 个顶点坐标不是有效数字'], warnings: [], stats: null };
+      }
+    }
+    for (i = 0; i < polys.length; i++) {
+      for (j = 0; j < polys[i].length; j++) {
+        if (!isFinite(polys[i][j].x) || !isFinite(polys[i][j].y)) {
+          return { ok: false, errors: ['第 ' + (i + 1) + ' 个多边形第 ' + (j + 1) + ' 个顶点坐标不是有效数字'], warnings: [], stats: null };
+        }
+      }
+    }
+
+    // 2. 边界
+    var bArea = Math.abs(signedArea2(boundary));
+    if (bArea < 1e-9) errors.push('边界多边形面积为 0（顶点重合或共线）');
+    var bSi = findSelfIntersection(boundary);
+    if (bSi) {
+      errors.push('边界多边形自相交：第 ' + bSi[0] + ' 条边与第 ' + bSi[1] + ' 条边交叉');
+    }
+    var bb = boxOf(boundary);
+
+    // 3. 每个多边形
+    var totalArea = 0, badArea = [], badSelf = [], tooBig = [];
+    for (i = 0; i < polys.length; i++) {
+      var pts = polys[i];
+      var a = Math.abs(signedArea2(pts));
+      totalArea += a;
+      var si = findSelfIntersection(pts);
+      if (si) badSelf.push(i + '(' + si[0] + '×' + si[1] + ')');
+      if (a < 1e-12) badArea.push(i);
+      if (!si) {
+        var pb = boxOf(pts);
+        if (pb.r - pb.l > bb.r - bb.l + 1e-9 || pb.t - pb.b > bb.t - bb.b + 1e-9) tooBig.push(i);
+      }
+    }
+    if (badArea.length) {
+      errors.push('有 ' + badArea.length + ' 个多边形面积为 0（顶点重合或共线），例：#' + badArea.slice(0, 5).join(', #'));
+    }
+    if (badSelf.length) {
+      errors.push('有 ' + badSelf.length + ' 个多边形自相交，例：#' + badSelf.slice(0, 5).join(', #'));
+    }
+    if (tooBig.length) {
+      errors.push('有 ' + tooBig.length + ' 个多边形的包围盒比边界还大，肯定放不进去，例：#' + tooBig.slice(0, 5).join(', #'));
+    }
+
+    // 4. 面积上界（必要条件）
+    if (bArea > 1e-12 && totalArea > bArea * (1 + 1e-9)) {
+      errors.push('多边形总面积 ' + totalArea.toFixed(2) + ' 超过边界面积 ' + bArea.toFixed(2) + '，无解');
+    }
+
+    // 5. 提示
+    if (bArea > 1e-12 && totalArea > bArea * 0.95) {
+      warnings.push('面积占比 ' + (totalArea / bArea * 100).toFixed(1) + '%，非常高，可能放不下');
+    }
+    if (polys.length > 400) warnings.push('多边形数量 ' + polys.length + ' 偏多，网页端求解会明显变慢');
+
+    return {
+      ok: errors.length === 0,
+      errors: errors,
+      warnings: warnings,
+      stats: {
+        n: polys.length,
+        boundaryVerts: boundary.length,
+        boundaryArea: bArea,
+        totalArea: totalArea,
+        ratio: bArea > 1e-12 ? totalArea / bArea : 0
+      }
+    };
+  }
+
   /* ============================ 结果校验 ============================ */
   /*
    * 独立校验：刻意不复用求解器里的 polyInBoundary / overlapBVH。
@@ -1579,6 +1686,7 @@
     prepare: prepare,
     solve: solve,
     verifySolution: verifyIndependent,
+    validateInput: validateInput,
     _verifySolutionOld: verifySolution,
     generateOrders: generateOrders,
     decodeOrder: decodeOrder,

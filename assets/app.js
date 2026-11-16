@@ -365,16 +365,37 @@
     return 0;
   }
 
+  function showCheck(v, prefix) {
+    var el = $('editorErr');
+    if (!v.ok) {
+      el.classList.remove('ok');
+      var msg = v.errors.slice(0, 3).join('；');
+      if (v.errors.length > 3) msg += ' …共 ' + v.errors.length + ' 项';
+      el.textContent = (prefix || '输入不合法：') + msg;
+      return false;
+    }
+    el.classList.add('ok');
+    el.textContent = '✓ ' + v.stats.n + ' 个多边形 · 面积占比 ' +
+      (v.stats.ratio * 100).toFixed(1) + '%' +
+      (v.warnings.length ? ' · ' + v.warnings[0] : '');
+    return true;
+  }
+
   function solveCurrent() {
     if (busy) return;
     var text = $('editor').value;
+
+    // 先做完整校验：结构、自交、零面积、面积上界。不合法就不提交给求解器。
+    var v = S.validateInput(text);
+    if (!showCheck(v)) return;
+
     var parsed = S.parseInput(text);
     if (parsed.error) {
       $('editorErr').textContent = '解析失败：' + parsed.error;
       return;
     }
-    $('editorErr').textContent = '';
     state.parsed = parsed;
+    state.ghostD = null;
     state.bbox = bboxOf(parsed.boundary);
     // 换了数据就必须丢掉旧帧，否则帧里的 focus / trans 索引会跟新多边形对不上
     state.frames = [];
@@ -457,7 +478,6 @@
       (res.ms / 1000).toFixed(1) + ' s 实际耗时';
     $('orderCard').hidden = true;
     $('phaseJump').innerHTML = '';
-    $('editorErr').textContent = '';
     goTo(0);
     play();
   }
@@ -468,6 +488,54 @@
     if (!f) return;
     var svg = f.svg.replace(/<\?xml[^>]*\?>/, '');
     $('frameBox').innerHTML = svg;
+    paintGhosts($('frameBox').querySelector('svg'));
+  }
+
+  // 单个多边形的路径片段（原位坐标，缓存一次）
+  function polyPathD(i) {
+    if (!state.ghostD) state.ghostD = [];
+    if (state.ghostD[i]) return state.ghostD[i];
+    var pts = state.parsed.polys[i];
+    var s = 'M' + pts[0].x.toFixed(3) + ' ' + pts[0].y.toFixed(3);
+    for (var k = 1; k < pts.length; k++) s += 'L' + pts[k].x.toFixed(3) + ' ' + pts[k].y.toFixed(3);
+    s += 'Z';
+    state.ghostD[i] = s;
+    return s;
+  }
+
+  /*
+   * 求解器输出的帧里只有"已放置"的多边形，未放置的那些看不见，
+   * 会让人以为多边形是凭空出现的。这里把它们按输入位置画成虚线底图。
+   * 已放置集合从帧里每个多边形中心的编号 <text> 反推。
+   */
+  function paintGhosts(svg) {
+    if (!svg || !state.parsed) return;
+    if (!$('tgGhost').checked) return;
+    var g = svg.querySelector('g');
+    if (!g) return;
+
+    var placed = {}, cnt = 0, texts = svg.querySelectorAll('text');
+    var n = state.parsed.polys.length;
+    for (var i = 0; i < texts.length; i++) {
+      var t = (texts[i].textContent || '').trim();
+      if (!/^\d+$/.test(t)) continue;
+      var v = +t;
+      if (v < n && !placed[v]) { placed[v] = 1; cnt++; }
+    }
+    if (!cnt) return;   // 反推不出已放置集合就不画，宁缺勿错
+
+    var d = '';
+    for (var k = 0; k < n; k++) if (!placed[k]) d += polyPathD(k);
+    if (!d) return;
+
+    var el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    el.setAttribute('d', d);
+    el.setAttribute('fill', 'rgba(120,120,114,0.045)');
+    el.setAttribute('fill-rule', 'nonzero');
+    el.setAttribute('stroke', 'rgba(120,120,114,0.5)');
+    el.setAttribute('stroke-width', '0.02');
+    el.setAttribute('stroke-dasharray', '0.1 0.07');
+    g.insertBefore(el, g.firstChild);
   }
 
   function showViewer(mode) {
@@ -477,11 +545,11 @@
     else { box.hidden = true; box.innerHTML = ''; cvEl.style.display = 'block'; resize(); }
 
     // 这些只对 JS 画布有意义（原位虚线、候选点、编号、阶段跳转）
-    var hideForWasm = ['.legend', '.toggles'];
-    for (var i = 0; i < hideForWasm.length; i++) {
-      var el = document.querySelector(hideForWasm[i]);
-      if (el) el.style.display = isWasm ? 'none' : '';
-    }
+    var legend = document.querySelector('.legend');
+    if (legend) legend.style.display = isWasm ? 'none' : '';
+    // 候选点、编号只对 JS 画布有效；"未放置"两种模式都适用
+    $('tgCandsWrap').style.display = isWasm ? 'none' : '';
+    $('tgTrailWrap').style.display = isWasm ? 'none' : '';
     $('phaseJump').style.display = isWasm ? 'none' : '';
   }
 
@@ -557,7 +625,7 @@
 
   function initWorker() {
     try {
-      worker = new Worker('assets/solver.worker.js?v=20261117a');
+      worker = new Worker('assets/solver.worker.js?v=20261117b');
       worker.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'progress') {
@@ -578,7 +646,7 @@
 
   function initWasmWorker() {
     try {
-      wasmWorker = new Worker('assets/wasm-worker.js?v=20261117a');
+      wasmWorker = new Worker('assets/wasm-worker.js?v=20261117b');
       wasmWorker.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'log') {
@@ -618,7 +686,10 @@
     $('slider').oninput = function () { pause(); goTo(parseInt(this.value, 10)); };
     $('speed').onchange = function () { state.speed = parseInt(this.value, 10); };
 
-    $('tgGhost').onchange = draw;
+    $('tgGhost').onchange = function () {
+      if (state.mode === 'wasm') setFrameSvg(state.wasmFrames[state.idx]);
+      else draw();
+    };
     $('tgCands').onchange = draw;
     $('tgTrail').onchange = draw;
 
@@ -634,11 +705,13 @@
       var name = window.prompt('给这个数据集起个名字：', '我的算例 ' + (loadCustom().length + 1));
       if (!name) return;
       var text = $('editor').value;
-      var check = S.parseInput(text);
-      if (check.error) {
-        $('editorErr').textContent = '当前文本无法解析，未添加：' + check.error;
+      var v = S.validateInput(text);
+      if (!v.ok) {
+        $('editorErr').classList.remove('ok');
+        $('editorErr').textContent = '输入不合法，未添加：' + v.errors.slice(0, 3).join('；');
         return;
       }
+      var check = S.parseInput(text);
       var list = loadCustom();
       var id = 'custom-' + Date.now().toString(36);
       list.push({
@@ -674,7 +747,16 @@
     };
 
     $('btnSolve').onclick = solveCurrent;
-    $('editor').addEventListener('input', markDirty);
+    var checkTimer = 0;
+    $('editor').addEventListener('input', function () {
+      markDirty();
+      clearTimeout(checkTimer);
+      checkTimer = setTimeout(function () {
+        var t = $('editor').value;
+        if (!t.trim()) return;
+        showCheck(S.validateInput(t), '输入不合法：');
+      }, 700);
+    });
     $('editor').addEventListener('keydown', function (e) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); solveCurrent(); }
     });

@@ -6,7 +6,7 @@
   <title>多边形排样求解器 · 过程可视化</title>
   <meta name="description" content="二维多边形排样求解器的逐步可视化：BVH 碰撞检测、NFP 候选搜索、全局压缩与模拟退火，可在线修改输入数据重新求解。">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="assets/app.css?v=20261117a">
+  <link rel="stylesheet" href="assets/app.css?v=20261117b">
 </head>
 <body>
 
@@ -62,9 +62,9 @@
 
       <div class="footrow">
         <div class="toggles">
-          <label><input type="checkbox" id="tgGhost" checked>未放置的原位</label>
-          <label><input type="checkbox" id="tgCands" checked>候选位置</label>
-          <label><input type="checkbox" id="tgTrail">已放置编号</label>
+          <label><input type="checkbox" id="tgGhost" checked>未放置的（原位虚线）</label>
+          <label id="tgCandsWrap"><input type="checkbox" id="tgCands" checked>候选位置</label>
+          <label id="tgTrailWrap"><input type="checkbox" id="tgTrail">已放置编号</label>
         </div>
         <div class="phasejump" id="phaseJump"></div>
       </div>
@@ -134,8 +134,8 @@
     </aside>
   </main>
 
-  <script src="assets/solver.js?v=20261117a"></script>
-  <script src="assets/data.js?v=20261117a"></script>
-  <script src="assets/app.js?v=20261117a"></script>
+  <script src="assets/solver.js?v=20261117b"></script>
+  <script src="assets/data.js?v=20261117b"></script>
+  <script src="assets/app.js?v=20261117b"></script>
 </body>
 </html>
