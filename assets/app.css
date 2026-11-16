@@ -96,11 +96,14 @@ canvas {
 
 #frameImg {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  width: auto;
+  height: auto;
   object-fit: contain;
-  background: #fbfbfa;
+  background: transparent;
 }
 
 #frameImg[hidden] { display: none; }
