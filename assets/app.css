@@ -88,12 +88,6 @@ main {
   background: #fff;
 }
 
-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
 /* 求解器输出的 SVG 自带 #FAFAFA 背景，但被 viewBox 比例限制在中间一条，
    两侧留白会显得像没画满。这里把容器底色设成同一个灰，视觉上就连成一片了。 */
 .canvas-wrap.wasm-mode {
@@ -126,29 +120,6 @@ canvas {
   font-size: 11px;
   letter-spacing: 0.04em;
   color: var(--muted);
-}
-
-.legend {
-  position: absolute;
-  bottom: 10px;
-  left: 12px;
-  display: flex;
-  gap: 14px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid var(--line-soft);
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.legend i {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 5px;
-  border-radius: 2px;
-  vertical-align: -1px;
 }
 
 .overlay {
@@ -246,7 +217,6 @@ input[type="range"] {
   display: flex;
   align-items: center;
   gap: 20px;
-  flex-wrap: wrap;
 }
 
 .foot {
@@ -283,25 +253,6 @@ input[type="range"] {
   font-size: 12px;
   color: var(--muted);
 }
-
-.phasejump {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding-left: 20px;
-  border-left: 1px solid var(--line);
-}
-
-.phasejump button {
-  font-size: 11px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  color: var(--muted);
-  border-color: var(--line);
-  background: #fff;
-}
-
-.phasejump button:hover { color: var(--accent); border-color: #b9d2ef; }
 
 .toggles label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .toggles input { accent-color: var(--accent); margin: 0; }
@@ -407,49 +358,6 @@ textarea:focus { border-color: var(--accent); }
 }
 
 .ok { color: var(--ok); }
-
-table.orders {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  font-size: 11.5px;
-}
-
-table.orders td:nth-child(2) { width: 92px; padding-right: 8px; }
-table.orders td:nth-child(3) { width: 54px; }
-
-table.orders td {
-  padding: 3px 0;
-  vertical-align: middle;
-  color: var(--muted);
-}
-
-table.orders td.name { color: var(--ink); padding-right: 8px; }
-
-table.orders tr.best td { color: var(--accent); font-weight: 600; }
-
-table.orders .track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--line-soft);
-  overflow: hidden;
-}
-
-table.orders .track i {
-  display: block;
-  height: 100%;
-  background: #c9c8c3;
-}
-
-table.orders tr.best .track i { background: var(--accent); }
-
-table.orders td.val {
-  font-family: var(--mono);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  padding-left: 8px;
-}
 
 .note {
   margin: 10px 0 0;

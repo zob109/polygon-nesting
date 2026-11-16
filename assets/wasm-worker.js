@@ -1,7 +1,7 @@
 /*
  * wasm-worker.js — 在后台线程里跑**原始 C++ 求解器**（经 Emscripten 编译）
  *
- * 与 assets/solver.js（JS 移植版）完全独立：这里执行的是 Solution.cpp 本身，
+ * 这里执行的就是 Solution.cpp 本身（经 Emscripten 编译），
  * 帧来自它自己的 saveFrame()，写进 Emscripten 的虚拟文件系统后读出来。
  */
 'use strict';

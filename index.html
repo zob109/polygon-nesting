@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>多边形排样求解器 · 过程可视化</title>
-  <meta name="description" content="二维多边形排样求解器的逐步可视化：BVH 碰撞检测、NFP 候选搜索、全局压缩与模拟退火，可在线修改输入数据重新求解。">
-  <meta name="nest-build" content="20261117e">
+  <meta name="description" content="华为软件精英挑战赛决赛赛题的可视化：在浏览器里运行求解器本体，逐帧回放放置、压缩与退火过程，可在线修改输入数据。">
+  <meta name="nest-build" content="20261117f">
   <meta http-equiv="Cache-Control" content="no-cache">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <script>
@@ -41,30 +41,23 @@
     window.__nestVersionCheck();
   })();
   </script>
-  <link rel="stylesheet" href="assets/app.css?v=20261117e">
+  <link rel="stylesheet" href="assets/app.css?v=20261117f">
 </head>
 <body>
 
   <header class="top">
     <div>
       <h1>多边形排样求解器 · 过程可视化</h1>
-      <p class="sub">三角剖分 + BVH → NFP 凸包近似 → 顺序放置 → 全局压缩 → 模拟退火</p>
+      <p class="sub">三角剖分 + BVH → NFP → 顺序放置 → 全局压缩 → 模拟退火</p>
     </div>
     <div class="topmeta" id="topMeta">—</div>
   </header>
 
   <main>
     <section class="stage">
-      <div class="canvas-wrap">
-        <canvas id="cv"></canvas>
-        <div id="frameBox" hidden aria-label="求解器输出帧"></div>
-        <div class="badge" id="phaseBadge">初始化</div>
-        <div class="legend">
-          <span><i style="background:#f2f6fb;border:1px solid #8d8d88"></i>边界</span>
-          <span><i style="background:#bcd3ec;border:1px solid #5b7fa6"></i>已放置</span>
-          <span><i style="background:#e9e8e4;border:1px dashed #a8a7a1"></i>未放置（原位）</span>
-          <span><i style="background:#1a6fd4"></i>当前</span>
-        </div>
+      <div class="canvas-wrap wasm-mode">
+        <div id="frameBox" aria-label="求解器输出帧"></div>
+        <div class="badge" id="phaseBadge">准备</div>
         <div class="overlay" id="overlay">
           <span id="overlayText">正在求解…</span>
           <div class="bar"><span id="overlayBar"></span></div>
@@ -98,10 +91,7 @@
       <div class="footrow">
         <div class="toggles">
           <label><input type="checkbox" id="tgGhost" checked>未放置的（原位虚线）</label>
-          <label id="tgCandsWrap"><input type="checkbox" id="tgCands" checked>候选位置</label>
-          <label id="tgTrailWrap"><input type="checkbox" id="tgTrail">已放置编号</label>
         </div>
-        <div class="phasejump" id="phaseJump"></div>
       </div>
     </section>
 
@@ -131,31 +121,14 @@
         <div class="card-label">输入数据（可直接改）</div>
         <textarea id="editor" spellcheck="false" aria-label="输入数据"></textarea>
         <div class="row">
-          <select id="engineSel" aria-label="求解引擎">
-            <option value="wasm" selected>原版 C++（WASM）</option>
-            <option value="js">JS 快速预览</option>
-          </select>
-        </div>
-        <div class="row">
           <select id="limitSel" aria-label="求解时限">
             <option value="8">快 · 约 12 秒</option>
             <option value="20">标准 · 约 20 秒</option>
             <option value="57" selected>完整 · 约 57 秒</option>
           </select>
-          <select id="qualitySel" aria-label="求解强度" hidden>
-            <option value="fast" selected>快速</option>
-            <option value="standard">标准</option>
-            <option value="thorough">彻底</option>
-          </select>
           <button class="primary" id="btnSolve">重新求解</button>
         </div>
         <p class="err" id="editorErr"></p>
-      </div>
-
-      <div class="card" id="orderCard" hidden>
-        <div class="card-label">放置顺序对比</div>
-        <table class="orders" id="orderTable"></table>
-        <p class="hint">共比较了若干启发式排序，Σ|trans| 越小越好。列表外的顺序判定为不可行。</p>
       </div>
 
       <div class="card">
@@ -165,17 +138,21 @@
           要求互不重叠、全部落在边界内，并让总位移 <b>Σ|trans|</b> 尽量小。
           求解器逐块放置、再整体朝原点压缩，最后用模拟退火扰动放置顺序。
         </p>
+        <p class="note">
+          画面的每一帧都是<b>求解器本体</b>输出的 SVG——同一份 C++ 源码编译成 WebAssembly 在浏览器里跑，
+          不是另写一份近似实现。
+        </p>
       </div>
     </aside>
   </main>
 
   <footer class="foot">
-    <span>版本 <b id="buildTag">20261117e</b></span>
+    <span>版本 <b id="buildTag">20261117f</b></span>
     <button class="linkish" id="btnCheckVer" type="button">检查更新</button>
   </footer>
 
-  <script src="assets/solver.js?v=20261117e"></script>
-  <script src="assets/data.js?v=20261117e"></script>
-  <script src="assets/app.js?v=20261117e"></script>
+  <script src="assets/input.js?v=20261117f"></script>
+  <script src="assets/data.js?v=20261117f"></script>
+  <script src="assets/app.js?v=20261117f"></script>
 </body>
 </html>
