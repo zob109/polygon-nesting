@@ -20,13 +20,17 @@
     speed: 110,
     lastT: 0,
     raf: 0,
-    stats: null
+    stats: null,
+    mode: 'js',          // 'js' = 移植版画布；'wasm' = 原版 C++ 的 SVG 帧
+    wasmFrames: [],
+    frameUrls: []
   };
 
   var cv = $('cv');
   var g = cv.getContext('2d');
   var view = { s: 1, ox: 0, oy: 0, w: 0, h: 0 };
   var worker = null;
+  var wasmWorker = null;
   var busy = false;
 
 
@@ -180,6 +184,7 @@
   }
 
   function draw() {
+    if (state.mode !== 'js') return;
     if (!view.w) return;
     g.clearRect(0, 0, view.w, view.h);
     if (!state.parsed) return;
@@ -292,11 +297,21 @@
     var f = state.frames[i];
     $('slider').value = String(i);
     $('counter').textContent = (i + 1) + ' / ' + state.frames.length;
+    $('mFrame').textContent = (i + 1) + '/' + state.frames.length;
+
+    if (state.mode === 'wasm') {
+      $('frameImg').src = state.frameUrls[i] || '';
+      $('phaseBadge').textContent = '原版 C++';
+      $('stepLabel').textContent = f.label || ('帧 ' + (i + 1));
+      $('mCost').textContent = (f.sum != null) ? f.sum.toFixed(3) : '—';
+      $('mPlaced').textContent = (f.placed != null) ? String(f.placed) : '—';
+      return;
+    }
+
     $('phaseBadge').textContent = phaseName(f.phase);
     $('stepLabel').textContent = f.label;
     $('mCost').textContent = f.cost.toFixed(3);
     $('mPlaced').textContent = f.placed ? String(f.placed.length) : String(state.parsed.polys.length);
-    $('mFrame').textContent = (i + 1) + '/' + state.frames.length;
     draw();
   }
 
@@ -380,6 +395,15 @@
     setOverlay('正在求解…', true);
     $('overlayBar').style.width = '2%';
 
+    var engine = $('engineSel').value;
+    if (engine === 'wasm') {
+      if (!wasmWorker) { fail('WASM 引擎没有就绪，请切换到 JS 快速预览'); return; }
+      var lim = parseInt($('limitSel').value, 10) || 20;
+      $('overlayText').textContent = '正在运行原始 C++ 求解器（WASM），时限 ' + lim + ' 秒…';
+      wasmWorker.postMessage({ type: 'solve', text: text, limit: lim });
+      return;
+    }
+
     var quality = $('qualitySel').value;
     if (worker) {
       worker.postMessage({ text: text, quality: quality });
@@ -401,6 +425,8 @@
     setBusy(false);
     if (!res || res.error) { fail(res && res.error || '求解失败'); return; }
     setOverlay('', false);
+    state.mode = 'js';
+    showViewer('js');
     state.frames = res.frames;
     state.stats = res.stats;
     $('slider').max = String(res.frames.length - 1);
@@ -412,6 +438,48 @@
     goTo(0);
     renderPhaseJump();
     play();
+  }
+
+  function finishWasm(res) {
+    setBusy(false);
+    if (!res || res.error) { fail(res && res.error || '求解失败'); return; }
+    if (!res.frames || !res.frames.length) { fail('求解器没有产出可视化帧'); return; }
+
+    for (var i = 0; i < state.frameUrls.length; i++) URL.revokeObjectURL(state.frameUrls[i]);
+    state.frameUrls = res.frames.map(function (f) {
+      return URL.createObjectURL(new Blob([f.svg], { type: 'image/svg+xml' }));
+    });
+    state.wasmFrames = res.frames;
+    state.frames = res.frames;
+    state.mode = 'wasm';
+    showViewer('wasm');
+
+    setOverlay('', false);
+    $('slider').max = String(res.frames.length - 1);
+    $('slider').value = '0';
+    $('topMeta').textContent =
+      res.trans.length + ' 个多边形 · 原版 C++ · 时限 ' + res.limit + ' s · ' +
+      (res.ms / 1000).toFixed(1) + ' s 实际耗时';
+    $('orderCard').hidden = true;
+    $('phaseJump').innerHTML = '';
+    $('editorErr').textContent = '';
+    goTo(0);
+    play();
+  }
+
+  function showViewer(mode) {
+    var img = $('frameImg'), cvEl = $('cv');
+    var isWasm = (mode === 'wasm');
+    if (isWasm) { img.hidden = false; cvEl.style.display = 'none'; }
+    else { img.hidden = true; cvEl.style.display = 'block'; resize(); }
+
+    // 这些只对 JS 画布有意义（原位虚线、候选点、编号、阶段跳转）
+    var hideForWasm = ['.legend', '.toggles'];
+    for (var i = 0; i < hideForWasm.length; i++) {
+      var el = document.querySelector(hideForWasm[i]);
+      if (el) el.style.display = isWasm ? 'none' : '';
+    }
+    $('phaseJump').style.display = isWasm ? 'none' : '';
   }
 
   function fail(msg) {
@@ -505,6 +573,37 @@
     }
   }
 
+  function initWasmWorker() {
+    try {
+      wasmWorker = new Worker('assets/wasm-worker.js');
+      wasmWorker.onmessage = function (e) {
+        var d = e.data || {};
+        if (d.type === 'log') {
+          var t = d.text;
+          var pct = 8;
+          if (/Phase0/.test(t)) pct = 6;
+          else if (/innerNFP/.test(t)) pct = 14;
+          else if (/Phase1/.test(t)) pct = 40;
+          else if (/Phase2/.test(t)) pct = 62;
+          else if (/Phase3/.test(t)) pct = 78;
+          else if (/Phase4/.test(t)) pct = 92;
+          else if (/Phase5/.test(t)) pct = 96;
+          $('overlayBar').style.width = pct + '%';
+        } else if (d.type === 'done') {
+          finishWasm(d.data);
+        } else if (d.type === 'error') {
+          fail(d.message);
+        }
+      };
+      wasmWorker.onerror = function (ev) {
+        wasmWorker = null;
+        $('editorErr').textContent = 'WASM worker 加载失败：' + (ev && ev.message || '未知');
+      };
+    } catch (e) {
+      wasmWorker = null;
+    }
+  }
+
   /* ---------------- 事件绑定 ---------------- */
 
   function bind() {
@@ -521,6 +620,12 @@
     $('tgTrail').onchange = draw;
 
     $('datasetSel').onchange = function () { selectDataset(this.value, true); };
+
+    $('engineSel').onchange = function () {
+      var isWasm = this.value === 'wasm';
+      $('limitSel').hidden = !isWasm;
+      $('qualitySel').hidden = isWasm;
+    };
 
     $('btnAdd').onclick = function () {
       var name = window.prompt('给这个数据集起个名字：', '我的算例 ' + (loadCustom().length + 1));
@@ -590,6 +695,7 @@
   function boot() {
     rebuild();
     initWorker();
+    initWasmWorker();
     bind();
     resize();
 

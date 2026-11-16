@@ -22,6 +22,7 @@
     <section class="stage">
       <div class="canvas-wrap">
         <canvas id="cv"></canvas>
+        <img id="frameImg" alt="求解器输出帧" hidden>
         <div class="badge" id="phaseBadge">初始化</div>
         <div class="legend">
           <span><i style="background:#f2f6fb;border:1px solid #8d8d88"></i>边界</span>
@@ -95,7 +96,18 @@
         <div class="card-label">输入数据（可直接改）</div>
         <textarea id="editor" spellcheck="false" aria-label="输入数据"></textarea>
         <div class="row">
-          <select id="qualitySel" aria-label="求解强度">
+          <select id="engineSel" aria-label="求解引擎">
+            <option value="wasm" selected>原版 C++（WASM）</option>
+            <option value="js">JS 快速预览</option>
+          </select>
+        </div>
+        <div class="row">
+          <select id="limitSel" aria-label="求解时限">
+            <option value="8" selected>快 · 约 12 秒</option>
+            <option value="20">标准 · 约 20 秒</option>
+            <option value="57">完整 · 约 57 秒</option>
+          </select>
+          <select id="qualitySel" aria-label="求解强度" hidden>
             <option value="fast" selected>快速</option>
             <option value="standard">标准</option>
             <option value="thorough">彻底</option>

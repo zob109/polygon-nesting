@@ -1,0 +1,63 @@
+--- Solution.cpp
++++ Solution_wasm.cpp
+@@ -50,13 +50,14 @@
+ bool g_enableAlign = false;  // 暂有缺陷
+ bool g_enableEngage = false;
+ 
+-bool g_vizEnable = false;
++bool g_vizEnable = true;   // [WASM 改动 1] 默认开启可视化，供网页读取帧
+ bool g_vizWriteFrameSvgs = true;
+ bool g_vizWriteBestSvgs = true;
+ bool g_vizWriteMainIndexHtml = true;
+ 
+ // 时间限制：57 秒（比赛时限通常 60 秒，留 3 秒余量）
+-const double TIME_LIMIT_SEC = 57.0;
++// [WASM 改动 2] 改为可配置：默认仍是 57.0，可由命令行参数 --time-limit <秒> 覆盖
++double TIME_LIMIT_SEC = 57.0;
+ 
+ // 全局计时器：程序启动时记录，getElapsedTime() 返回已运行秒数
+ auto global_start_time = chrono::high_resolution_clock::now();
+@@ -363,14 +364,22 @@
+ #else
+     ltm = *localtime(&t);      // Linux/macOS 标准版本
+ #endif
++#ifdef __EMSCRIPTEN__
++    // [WASM 改动 3] 固定目录名并递归创建。
++    // 浏览器里 fs::create_directory 建子目录会失败（父目录不存在时），
++    // 且目录名依赖本地时间，网页侧不便定位，因此这里固定为 visualizations/frames。
++    (void)now; (void)t; (void)ltm;
++    vizDir = "visualizations/frames";
++#else
+     ostringstream ss;
+     ss << "visualizations/viz_" << put_time(&ltm, "%Y%m%d_%H%M%S");
+     vizDir = ss.str();
++#endif
+     vizFrame = 0;
+     g_vizAlignEdges.clear();
+     g_vizBestSnaps.clear();
+     error_code ec;
+-    fs::create_directory(vizDir, ec);
++    fs::create_directories(vizDir, ec);
+ }
+ 
+ // 保存一帧 SVG 图像
+@@ -4585,10 +4594,18 @@
+ //   2. N 行平移量：x y（精度 5 位小数）
+ //   3. 字符串 "OK"
+ 
+-int main() {
++int main(int argc, char** argv) {
+     // 加速 I/O：禁用 C 和 C++ 流的同步（cin/cout 不与 scanf/printf 混用即可）
+     ios_base::sync_with_stdio(false); cin.tie(NULL);
+ 
++    // [WASM 改动 2] 允许外部调整时间预算：--time-limit <秒>
++    for (int ai = 1; ai + 1 < argc; ai++) {
++        if (string(argv[ai]) == "--time-limit") {
++            double v = atof(argv[ai + 1]);
++            if (v > 0.5) TIME_LIMIT_SEC = v;
++        }
++    }
++
+     static int max_keep = 50;
+ 
+     // ============ 读取边界多边形 (V2 正式赛新格式) ============
