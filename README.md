@@ -59,7 +59,7 @@ git push -u origin main
 ```
 
 然后在仓库 **Settings → Pages** 里把 Source 设为 `Deploy from a branch`、分支 `main`、目录 `/ (root)`，
-访问 `https://zob109.github.io/polygon-nesting/`。
+访问 [https://zob109.github.io/polygon-nesting/](https://zob109.github.io/polygon-nesting/)
 
 所有资源都用相对路径（`assets/...`），挂在子路径下不会失效。`.nojekyll` 用来关掉 Jekyll 构建，
 避免以后出现以下划线开头的文件被吞掉。
