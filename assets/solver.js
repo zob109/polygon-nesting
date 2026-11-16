@@ -536,11 +536,13 @@
 
     var GB = ctx.GBound;
     var ei = ctx.edgeIndex;
-    var stamp = ei.stamp, tick = ++ei.tick;
+    var stamp = ei.stamp;
     var cell = ei.cell, nx = ei.nx;
     var gx0, gy0, gx1, gy1, gx, gy, arr, ai;
 
     for (var i = 0; i < nm; i++) {
+      // 去重表必须按"内边"重置：同一条边界边要和每一条内边都比较一次
+      var tick = ++ei.tick;
       var p0 = innerPts[i], p1 = innerPts[(i + 1) % nm];
       var ax = p0.x + ocx, ay = p0.y + ocy;
       var bx = p1.x + ocx, by = p1.y + ocy;
@@ -575,6 +577,15 @@
       }
     }
 
+    // 判定点必须是多边形内部的一个点：凹多边形的包围盒中心可能落在自己外面，
+    // 也可能正好压在边界顶点上（射线法在顶点上结果不确定）。
+    // 用第一个三角形的重心，保证严格在内部。
+    var tris = shape.tris;
+    if (tris.length) {
+      var t0 = tris[0].p;
+      return pointInPoly(V((t0[0].x + t0[1].x + t0[2].x) / 3 + ocx,
+                           (t0[0].y + t0[1].y + t0[2].y) / 3 + ocy), boundary);
+    }
     return pointInPoly(V((wl + wr) * 0.5, (wbb + wtt) * 0.5), boundary);
   }
 
@@ -1241,9 +1252,9 @@
   /* ============================ 总控 ============================ */
 
   var QUALITY = {
-    fast: { sampleStep: 0.5, maxEdgeSamples: 4, gridSeed: 260, gridChecks: 200, orderLimit: 6, compactRounds: 4, saIter: 8 },
-    standard: { sampleStep: 0.2, maxEdgeSamples: 8, gridSeed: 420, gridChecks: 600, orderLimit: 8, compactRounds: 6, saIter: 10 },
-    thorough: { sampleStep: 0.06, maxEdgeSamples: 24, gridSeed: 900, gridChecks: 2400, orderLimit: 16, compactRounds: 10, saIter: 40 }
+    fast: { sampleStep: 0.4, maxEdgeSamples: 6, gridSeed: 360, gridChecks: 300, orderLimit: 10, compactRounds: 5, saIter: 10 },
+    standard: { sampleStep: 0.2, maxEdgeSamples: 10, gridSeed: 520, gridChecks: 800, orderLimit: 14, compactRounds: 7, saIter: 16 },
+    thorough: { sampleStep: 0.06, maxEdgeSamples: 24, gridSeed: 900, gridChecks: 2400, orderLimit: 20, compactRounds: 10, saIter: 40 }
   };
 
   function mergeOpts(o) {
@@ -1266,7 +1277,7 @@
     var triCount = 0;
     for (i = 0; i < ctx.shapes.length; i++) triCount += ctx.shapes[i].tris.length;
 
-    var initCheck = verifySolution(ctx, zero);
+    var initCheck = verifyIndependent(ctx, zero);
     var initDesc = '初始状态 · ' + n + ' 个多边形全部停在输入坐标上：' +
       initCheck.outside + ' 个越出边界、' + initCheck.overlaps + ' 对互相重叠，约束一条都没满足';
     frames.push(snapshot(ctx, 'init', initDesc, zero, [], -1, {
@@ -1288,7 +1299,7 @@
     for (i = 0; i < limit; i++) {
       var trs = [];
       var c = decodeOrder(ctx, orders[i].order, trs, opts.compactRounds, opts, null);
-      table.push({ name: orders[i].name, dir: orders[i].key, cost: c });
+      table.push({ name: orders[i].name, dir: orders[i].key, cost: c, feasible: c < INF * 0.5 });
       if (c < bestCost) {
         bestCost = c; bestOrder = orders[i].order; bestTrans = trs; bestName = orders[i].name;
       }
@@ -1388,13 +1399,15 @@
       for (i = 0; i < finalTrace.length; i++) frames.push(finalTrace[i]);
     }
 
+    var verify = verifyIndependent(ctx, trueTrans);
+    var checkDesc = verify.valid
+      ? '独立校验通过：0 越界、0 重叠'
+      : '独立校验未通过：越界 ' + verify.outside + ' 个、重叠 ' + verify.overlaps + ' 对';
     frames.push(snapshot(ctx, 'done',
-      '完成 · 全部 ' + n + ' 个多边形合法排布，Σ|trans| = ' + trueCost.toFixed(3),
+      '完成 · Σ|trans| = ' + trueCost.toFixed(3) + ' · ' + checkDesc,
       trueTrans, null, -1, { meta: { cost: trueCost } }));
 
-    var verify = verifySolution(ctx, trueTrans);
-
-    return {
+     return {
       frames: frames,
       orderTable: table,
       result: {
@@ -1413,12 +1426,132 @@
         saMs: Date.now() - saStart,
         valid: verify.valid,
         overlaps: verify.overlaps,
-        outside: verify.outside
+        outside: verify.outside,
+        depth: verify.depth
       }
     };
   }
 
   /* ============================ 结果校验 ============================ */
+  /*
+   * 独立校验：刻意不复用求解器里的 polyInBoundary / overlapBVH。
+   * 边界判定改为"沿每条边密集采样 + 射线法"，与求解器的"边相交 + 单点判定"
+   * 是两套完全不同的方法，避免同一处 bug 让求解器和校验器一起说谎。
+   */
+
+  function distToSeg(px, py, a, b) {
+    var vx = b.x - a.x, vy = b.y - a.y;
+    var wx = px - a.x, wy = py - a.y;
+    var L2 = vx * vx + vy * vy;
+    if (L2 < 1e-18) return Math.sqrt(wx * wx + wy * wy);
+    var t = (wx * vx + wy * vy) / L2;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    var dx = px - (a.x + vx * t), dy = py - (a.y + vy * t);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function sampleOutside(pts, tx, ty, boundary, step) {
+    var bad = 0, worst = 0;
+    var n = pts.length;
+    for (var i = 0; i < n; i++) {
+      var a = pts[i], b = pts[(i + 1) % n];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      var k = Math.floor(len / step) + 2;
+      if (k < 2) k = 2;
+      if (k > 40) k = 40;
+      for (var s = 0; s < k; s++) {
+        var t = s / (k - 1);
+        var px = a.x + tx + dx * t, py = a.y + ty + dy * t;
+        if (!pointInPoly(V(px, py), boundary)) {
+          bad++;
+          // 越界深度：该点到边界各边的最近距离
+          var dp = Infinity;
+          for (var q = 0; q < boundary.length; q++) {
+            var dd = distToSeg(px, py, boundary[q], boundary[(q + 1) % boundary.length]);
+            if (dd < dp) dp = dd;
+          }
+          if (dp > worst) worst = dp;
+        }
+      }
+    }
+    return bad;
+  }
+
+  // 与求解器分开写的三角形 SAT，只用于校验
+  function satTri(t1, o1x, o1y, t2, o2x, o2y) {
+    var sets = [[t1, o1x, o1y, t2, o2x, o2y], [t2, o2x, o2y, t1, o1x, o1y]];
+    for (var k = 0; k < 2; k++) {
+      var A = sets[k][0], ax = sets[k][1], ay = sets[k][2];
+      var B = sets[k][3], bx = sets[k][4], by = sets[k][5];
+      for (var i = 0; i < 3; i++) {
+        var p0 = A.p[i], p1 = A.p[(i + 1) % 3];
+        var nx = -(p1.y - p0.y), ny = (p1.x - p0.x);
+        var a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+        for (var j = 0; j < 3; j++) {
+          var va = (A.p[j].x + ax) * nx + (A.p[j].y + ay) * ny;
+          var vb = (B.p[j].x + bx) * nx + (B.p[j].y + by) * ny;
+          if (va < a0) a0 = va;
+          if (va > a1) a1 = va;
+          if (vb < b0) b0 = vb;
+          if (vb > b1) b1 = vb;
+        }
+        if (a1 <= b0 + 1e-8 || b1 <= a0 + 1e-8) return false;
+      }
+    }
+    return true;
+  }
+
+  var DEPTH_TOL = 1e-3;   // 与题面"超出面积 < 1e-3"同一量级
+
+  function verifyIndependent(ctx, trans) {
+    var outside = 0, deep = 0, pairs = 0;
+    var i, j;
+    var step = 0.02;
+
+    for (i = 0; i < ctx.n; i++) {
+      var Pi = ctx.polys[i];
+      var bad = sampleOutside(ctx.shapes[Pi.shape_id].pts,
+        Pi.shape_offset.x + trans[i].x, Pi.shape_offset.y + trans[i].y,
+        ctx.boundary, step);
+      if (bad > 0) {
+        outside++;
+        if (bad > deep) deep = bad;
+      }
+    }
+
+    var boxes = [];
+    for (i = 0; i < ctx.n; i++) {
+      var b = boxMoved(ctx.polys[i].bbox, trans[i]);
+      boxes.push(b);
+    }
+    for (i = 0; i < ctx.n; i++) {
+      for (j = i + 1; j < ctx.n; j++) {
+        if (!boxIntersects(boxes[i], boxes[j])) continue;
+        var Si = ctx.shapes[ctx.polys[i].shape_id];
+        var Sj = ctx.shapes[ctx.polys[j].shape_id];
+        var oix = ctx.polys[i].shape_offset.x + trans[i].x;
+        var oiy = ctx.polys[i].shape_offset.y + trans[i].y;
+        var ojx = ctx.polys[j].shape_offset.x + trans[j].x;
+        var ojy = ctx.polys[j].shape_offset.y + trans[j].y;
+        var hit = false;
+        for (var a = 0; a < Si.tris.length && !hit; a++) {
+          for (var c = 0; c < Sj.tris.length; c++) {
+            if (satTri(Si.tris[a], oix, oiy, Sj.tris[c], ojx, ojy)) { hit = true; break; }
+          }
+        }
+        if (hit) pairs++;
+      }
+    }
+    return {
+      valid: deep <= DEPTH_TOL && pairs === 0,
+      outside: outside,
+      depth: deep,
+      overlaps: pairs
+    };
+  }
+
+
 
   function verifySolution(ctx, trans) {
     var overlaps = 0, outside = 0;
@@ -1445,11 +1578,12 @@
     parseInput: parseInput,
     prepare: prepare,
     solve: solve,
-    verifySolution: verifySolution,
+    verifySolution: verifyIndependent,
+    _verifySolutionOld: verifySolution,
     generateOrders: generateOrders,
     decodeOrder: decodeOrder,
     QUALITY: QUALITY,
-    _internals: { convexHull: convexHull, minkowskiSum: minkowskiSum, shapeHull: shapeHull, getNFP: getNFP },
+    _internals: { convexHull: convexHull, minkowskiSum: minkowskiSum, shapeHull: shapeHull, getNFP: getNFP, polyInBoundary: polyInBoundary, bboxInsideBoundary: bboxInsideBoundary, pointInPoly: pointInPoly },
     _dbg: _dbg,
     _resetDbg: function () { _dbg.tryV = 0; _dbg.check = 0; _dbg.boundary = 0; _dbg.bvh = 0; }
   };

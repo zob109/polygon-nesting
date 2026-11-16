@@ -427,8 +427,10 @@
     els.innerHTML = '';
     var best = table[0].cost;
     var worst = 0;
-    table.forEach(function (r) { if (isFinite(r.cost) && r.cost > worst) worst = r.cost; });
-    if (!worst) worst = best || 1;
+    table.forEach(function (r) {
+      if (r.feasible !== false && isFinite(r.cost) && r.cost > worst) worst = r.cost;
+    });
+    if (!worst || worst > 1e15) worst = best || 1;
 
     table.slice(0, 10).forEach(function (r, i) {
       var tr = document.createElement('tr');
@@ -442,15 +444,17 @@
       var track = document.createElement('div');
       track.className = 'track';
       var fill = document.createElement('i');
-      var w = isFinite(r.cost) ? Math.max(3, Math.round((r.cost / worst) * 100)) : 100;
+      var ok = (r.feasible !== false) && isFinite(r.cost) && r.cost < 1e15;
+      var w = ok ? Math.max(3, Math.round((r.cost / worst) * 100)) : 100;
       fill.style.width = w + '%';
-      fill.style.background = isFinite(r.cost) ? '' : '#d8b4a0';
+      fill.style.background = ok ? '' : '#e0d3c8';
       track.appendChild(fill);
       td2.appendChild(track);
 
       var td3 = document.createElement('td');
       td3.className = 'val';
-      td3.textContent = isFinite(r.cost) ? r.cost.toFixed(1) : '不可行';
+      td3.textContent = (r.feasible !== false && isFinite(r.cost) && r.cost < 1e15)
+        ? r.cost.toFixed(1) : '不可行';
 
       tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
       els.appendChild(tr);
