@@ -541,6 +541,7 @@
   function showViewer(mode) {
     var box = $('frameBox'), cvEl = $('cv');
     var isWasm = (mode === 'wasm');
+    document.querySelector('.canvas-wrap').classList.toggle('wasm-mode', isWasm);
     if (isWasm) { box.hidden = false; cvEl.style.display = 'none'; }
     else { box.hidden = true; box.innerHTML = ''; cvEl.style.display = 'block'; resize(); }
 
@@ -625,7 +626,7 @@
 
   function initWorker() {
     try {
-      worker = new Worker('assets/solver.worker.js?v=20261117b');
+      worker = new Worker('assets/solver.worker.js?v=20261117c');
       worker.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'progress') {
@@ -646,7 +647,7 @@
 
   function initWasmWorker() {
     try {
-      wasmWorker = new Worker('assets/wasm-worker.js?v=20261117b');
+      wasmWorker = new Worker('assets/wasm-worker.js?v=20261117c');
       wasmWorker.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'log') {

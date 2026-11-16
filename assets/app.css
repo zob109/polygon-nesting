@@ -94,10 +94,17 @@ canvas {
   height: 100%;
 }
 
+/* 求解器输出的 SVG 自带 #FAFAFA 背景，但被 viewBox 比例限制在中间一条，
+   两侧留白会显得像没画满。这里把容器底色设成同一个灰，视觉上就连成一片了。 */
+.canvas-wrap.wasm-mode {
+  background: #FAFAFA;
+}
+
 #frameBox {
   position: absolute;
   inset: 16px;
   overflow: hidden;
+  background: transparent;
 }
 
 #frameBox svg {

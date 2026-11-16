@@ -6,7 +6,7 @@
   <title>多边形排样求解器 · 过程可视化</title>
   <meta name="description" content="二维多边形排样求解器的逐步可视化：BVH 碰撞检测、NFP 候选搜索、全局压缩与模拟退火，可在线修改输入数据重新求解。">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="assets/app.css?v=20261117b">
+  <link rel="stylesheet" href="assets/app.css?v=20261117c">
 </head>
 <body>
 
@@ -103,9 +103,9 @@
         </div>
         <div class="row">
           <select id="limitSel" aria-label="求解时限">
-            <option value="8" selected>快 · 约 12 秒</option>
+            <option value="8">快 · 约 12 秒</option>
             <option value="20">标准 · 约 20 秒</option>
-            <option value="57">完整 · 约 57 秒</option>
+            <option value="57" selected>完整 · 约 57 秒</option>
           </select>
           <select id="qualitySel" aria-label="求解强度" hidden>
             <option value="fast" selected>快速</option>
@@ -134,8 +134,8 @@
     </aside>
   </main>
 
-  <script src="assets/solver.js?v=20261117b"></script>
-  <script src="assets/data.js?v=20261117b"></script>
-  <script src="assets/app.js?v=20261117b"></script>
+  <script src="assets/solver.js?v=20261117c"></script>
+  <script src="assets/data.js?v=20261117c"></script>
+  <script src="assets/app.js?v=20261117c"></script>
 </body>
 </html>
